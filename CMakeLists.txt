@@ -14,6 +14,9 @@ if (WIN32)
     find_package(libusb-1.0 REQUIRED)
     find_package(libftdi1 CONFIG REQUIRED)
 
+    get_target_property(_libusb_targets libusb-1.0::libusb-1.0 INTERFACE_INCLUDE_DIRECTORIES)
+    message(STATUS "libusb include dirs: ${_libusb_targets}")
+
     set(LIBFTDI1_LIBRARIES libftdi1 libusb-1.0)
     # include dirs are handled by the imported targets
 else()

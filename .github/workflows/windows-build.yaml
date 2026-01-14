@@ -31,6 +31,11 @@ jobs:
       run: |
         ${{ github.workspace }}/vcpkg/vcpkg install libftdi1:x64-windows libusb:x64-windows
 
+    - name: List vcpkg contents
+      run: |
+        echo "VCPKG_ROOT = ${{ github.workspace }}/vcpkg"
+        dir "${{ github.workspace }}\vcpkg" /s /b
+
     - name: Configure CMake
       run: |
         cmake -S . -B build `

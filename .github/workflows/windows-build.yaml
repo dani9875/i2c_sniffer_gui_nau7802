@@ -25,21 +25,21 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgGitCommitId: 84bab45d415d22042bd0b9081aea57f362da3f35
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
 
     - name: Install dependencies
       run: |
-        vcpkg install libftdi1 libusb
+        ${{ github.workspace }}/vcpkg/vcpkg install libftdi1:x64-windows libusb:x64-windows
 
-    - name: Configure
+    - name: Configure CMake
       run: |
         cmake -S . -B build `
           -G "NMake Makefiles" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
     - name: Build
-      run: |
-        cmake --build build
+      run: cmake --build build
 
     - name: Deploy Qt
       run: |
@@ -49,8 +49,8 @@ jobs:
 
     - name: Copy FTDI DLLs
       run: |
-        copy ${{ env.VCPKG_ROOT }}\installed\x64-windows\bin\libftdi1.dll deploy\
-        copy ${{ env.VCPKG_ROOT }}\installed\x64-windows\bin\libusb-1.0.dll deploy\
+        copy ${{ github.workspace }}\vcpkg\installed\x64-windows\bin\libftdi1.dll deploy\
+        copy ${{ github.workspace }}\vcpkg\installed\x64-windows\bin\libusb-1.0.dll deploy\
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

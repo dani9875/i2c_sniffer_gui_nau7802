@@ -9,8 +9,17 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBFTDI1 REQUIRED libftdi1)
+if (WIN32)
+    # On Windows, libftdi is expected to come from vcpkg
+    find_package(libusb-1.0 REQUIRED)
+    find_package(libftdi1 CONFIG REQUIRED)
+
+    set(LIBFTDI1_LIBRARIES libftdi1 libusb-1.0)
+    # include dirs are handled by the imported targets
+else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBFTDI1 REQUIRED libftdi1)
+endif()
 
 add_executable(FTDI_Viewer
     main.cpp
@@ -18,9 +27,11 @@ add_executable(FTDI_Viewer
     mainwindow.h
 )
 
-target_include_directories(FTDI_Viewer PRIVATE
-    ${LIBFTDI1_INCLUDE_DIRS}
-)
+if (NOT WIN32)
+    target_include_directories(FTDI_Viewer PRIVATE
+        ${LIBFTDI1_INCLUDE_DIRS}
+    )
+endif()
 
 target_link_libraries(FTDI_Viewer PRIVATE
     Qt6::Widgets

@@ -1,0 +1,59 @@
+name: Windows Qt Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.6.1'
+        arch: win64_msvc2019_64
+        cache: true
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: '2024.02.14'
+
+    - name: Install dependencies
+      run: |
+        vcpkg install libftdi1 libusb
+
+    - name: Configure
+      run: |
+        cmake -S . -B build `
+          -G "NMake Makefiles" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+
+    - name: Build
+      run: |
+        cmake --build build
+
+    - name: Deploy Qt
+      run: |
+        mkdir deploy
+        copy build\FTDI_Viewer.exe deploy\
+        windeployqt deploy\FTDI_Viewer.exe
+
+    - name: Copy FTDI DLLs
+      run: |
+        copy ${{ env.VCPKG_ROOT }}\installed\x64-windows\bin\libftdi1.dll deploy\
+        copy ${{ env.VCPKG_ROOT }}\installed\x64-windows\bin\libusb-1.0.dll deploy\
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: FTDI_Viewer_Windows
+        path: deploy

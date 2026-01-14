@@ -2,6 +2,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTimer>
+#include <QDateTime> // Make sure this include exists at the top
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -39,12 +41,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(timer, &QTimer::timeout, this, &MainWindow::readFtdiData);
     timer->start(50);
 
-    // Timer for periodic OK updates
-    okTimer = new QTimer(this);
-    connect(okTimer, &QTimer::timeout, this, [this]() {
-        statusEdit->append("OK");
-    });
-    okTimer->start(1000); // every 1000 ms = 1 second
+    // okTimer = new QTimer(this);
+    // connect(okTimer, &QTimer::timeout, this, [this]() {
+    //     QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+    //     statusEdit->append(QString("[%1] OK").arg(ts));
+    // });
+    // okTimer->start(1000); // every 1 second
 }
 
 MainWindow::~MainWindow()
@@ -67,6 +69,7 @@ MainWindow::~MainWindow()
 //     }
 // }
 
+
 void MainWindow::readFtdiData()
 {
     static int byteCount = 0;
@@ -85,11 +88,11 @@ void MainWindow::readFtdiData()
         if (!strLine.startsWith("[2AW"))
             continue;
 
-        // Append raw line to main textEdit
-        textEdit->append(strLine);
+        // Prepend timestamp for main serial window
+        QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+        textEdit->append(QString("[%1] %2").arg(timestamp, strLine));
 
         // Extract the data byte from the line
-        // Expected format: [2AWAXX[2ARAYYN]  -> YY is the register value
         int rIndex = strLine.indexOf("[2AR");
         if (rIndex == -1 || rIndex + 5 >= strLine.length())
             continue;
@@ -107,8 +110,13 @@ void MainWindow::readFtdiData()
         // Once we have 3 bytes, convert to 24-bit value
         if (byteCount == 3) {
             int32_t result = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
-            statusEdit->append(QString::number(result));
+
+            // Prepend timestamp for status window
+            QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+            statusEdit->append(QString("[%1] %2").arg(ts).arg(result));
+
             byteCount = 0; // reset for next value
         }
     }
 }
+

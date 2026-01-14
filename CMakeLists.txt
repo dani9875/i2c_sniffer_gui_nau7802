@@ -10,15 +10,15 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 if (WIN32)
-    # On Windows, libftdi is expected to come from vcpkg
-    find_package(libusb-1.0 REQUIRED)
+    # On Windows, libftdi and libusb come from vcpkg
+    find_package(libusb CONFIG REQUIRED)
     find_package(libftdi1 CONFIG REQUIRED)
 
-    get_target_property(_libusb_targets libusb-1.0::libusb-1.0 INTERFACE_INCLUDE_DIRECTORIES)
-    message(STATUS "libusb include dirs: ${_libusb_targets}")
+    # vcpkg's libusb port gives these variables
+    message(STATUS "libusb include dirs: ${LIBUSB_INCLUDE_DIRS}")
+    message(STATUS "libusb libraries: ${LIBUSB_LIBRARIES}")
 
-    set(LIBFTDI1_LIBRARIES libftdi1 libusb-1.0)
-    # include dirs are handled by the imported targets
+    set(LIBFTDI1_LIBRARIES libftdi1 ${LIBUSB_LIBRARIES})
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LIBFTDI1 REQUIRED libftdi1)

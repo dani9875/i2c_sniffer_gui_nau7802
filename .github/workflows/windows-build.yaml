@@ -29,7 +29,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        ${{ github.workspace }}/vcpkg/vcpkg install libftdi1:x64-windows libusb:x64-windows
+        ${{ github.workspace }}/vcpkg/vcpkg install
 
     - name: Configure CMake
       run: |

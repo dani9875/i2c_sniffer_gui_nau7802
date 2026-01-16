@@ -64,3 +64,5 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: build/**
+        env:
+           GITHUB_TOKEN: ${{ secrets.PAT }}

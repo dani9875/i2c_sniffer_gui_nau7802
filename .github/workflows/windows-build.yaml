@@ -1,0 +1,65 @@
+name: Build FTDI_Viewer Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        config: [Release]
+
+    steps:
+      # 1. Checkout repository
+      - uses: actions/checkout@v4
+
+      # 2. Install MSYS2 for MinGW
+      - name: Install MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-pkg-config
+
+      # 3. Install Qt 6.10.1 (MinGW) using your preferred action
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          version: '6.10.1'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+
+      # 4. Prepare MSYS2 shell for building
+      - name: Setup MSYS2 shell
+        shell: msys2 {0}
+        run: echo "MSYS2 shell ready"
+
+      # 5. Configure CMake
+      - name: Configure CMake
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          cmake -S . -B build -G "MinGW Makefiles"
+
+      # 6. Build the project
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          cmake --build build --config ${{ matrix.config }}
+
+      # 7. Upload the built executable
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: FTDI_Viewer
+          path: build/FTDI_Viewer.exe

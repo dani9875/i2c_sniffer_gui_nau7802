@@ -4,24 +4,34 @@ project(FTDI_Viewer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Qt (MinGW build on Windows)
-if(WIN32)
-    set(Qt6_DIR "C:/Qt/6.10.1/mingw_64/lib/cmake/Qt6")
+# ---------------------------------------------------------
+# Qt (Windows: MinGW) - use environment variable if set
+# ---------------------------------------------------------
+if(WIN32 AND NOT DEFINED ENV{QT6_DIR})
+    message(FATAL_ERROR "Please set the QT6_DIR environment variable or install Qt")
 endif()
+
+if(DEFINED ENV{QT6_DIR})
+    set(Qt6_DIR $ENV{QT6_DIR})
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
+# ---------------------------------------------------------
+# Executable
+# ---------------------------------------------------------
 add_executable(FTDI_Viewer
     main.cpp
     mainwindow.cpp
 )
 
-# ------------------------------
+# ---------------------------------------------------------
 # Handle libraries differently by platform
-# ------------------------------
+# ---------------------------------------------------------
 if(WIN32)
     # Windows: use bundled libusb and libftdi
     set(LIBUSB_ROOT  "${CMAKE_CURRENT_SOURCE_DIR}/libusb")

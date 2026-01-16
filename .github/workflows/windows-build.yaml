@@ -1,5 +1,9 @@
 name: Build FTDI_Viewer Windows
 
+
+permissions:
+  contents: write
+  
 on:
   push:
     branches: [main]

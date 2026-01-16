@@ -4,6 +4,7 @@
 #include <QTextEdit>
 #include <QTimer>
 #include <ftdi.h>
+#include <QLineEdit> 
 
 class MainWindow : public QMainWindow
 {
@@ -19,7 +20,10 @@ private slots:
 private:
     QTextEdit *textEdit;
     QTextEdit *statusEdit;
-    struct ftdi_context *ftdi;
     QTimer *timer;
     QTimer *okTimer;
+    struct ftdi_context *ftdi;
+
+    QLineEdit *tareInput;
+    double tareValue;
 };

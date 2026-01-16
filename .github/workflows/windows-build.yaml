@@ -61,10 +61,9 @@ jobs:
           path: build/
 
       - name: Create release zip
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          cd build
-          zip -r FTDI_Viewer-Windows.zip .
+          Compress-Archive -Path build\* -DestinationPath build\FTDI_Viewer-Windows.zip
 
       # Create release + attach ZIP ONLY for tags
       - name: Create GitHub Release

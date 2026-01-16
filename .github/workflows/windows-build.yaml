@@ -62,4 +62,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FTDI_Viewer
-          path: build/FTDI_Viewer.exe
+          path: build/

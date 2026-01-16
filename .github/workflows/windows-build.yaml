@@ -60,13 +60,19 @@ jobs:
           name: FTDI_Viewer-Windows
           path: build/
 
-      # Create release + attach same artifact ONLY for tags
+      - name: Create release zip
+        shell: msys2 {0}
+        run: |
+          cd build
+          zip -r FTDI_Viewer-Windows.zip .
+
+      # Create release + attach ZIP ONLY for tags
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          files: build/**
+          files: build/FTDI_Viewer-Windows.zip
         env:
-           GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}

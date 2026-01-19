@@ -17,20 +17,28 @@ MainWindow::MainWindow(QWidget *parent)
     rawEdit = new QTextEdit(this);
     rawEdit->setReadOnly(true);
     rawEdit->setPlaceholderText("Raw FTDI data");
+    rawEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    rawEdit->setMinimumHeight(300);
 
     // --- Extracted values window ---
     extractedEdit = new QTextEdit(this);
     extractedEdit->setReadOnly(true);
     extractedEdit->setPlaceholderText("Extracted 24-bit values");
+    extractedEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    extractedEdit->setMinimumHeight(300);
 
     // --- Tared values window ---
     taredEdit = new QTextEdit(this);
     taredEdit->setReadOnly(true);
     taredEdit->setPlaceholderText("Tared values");
+    taredEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    taredEdit->setMinimumHeight(300);
 
     // --- Status pane ---
     statusEdit = new QTextEdit(this);
     statusEdit->setReadOnly(true);
+    statusEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    statusEdit->setMinimumHeight(300);
 
     // --- Start / Stop button ---
     startStopButton = new QPushButton("Start", this);
@@ -44,8 +52,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     // --- Tare input field ---
     QHBoxLayout *tareLayout = new QHBoxLayout();
-    // QLabel *tareLabel = new QLabel("Taress:", this);
-    // tareLayout->addWidget(tareLabel);
 
     tareInput = new QLineEdit(this);
     tareInput->setPlaceholderText("Enter taring value");
@@ -66,31 +72,31 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // --- Layouts ---
+    // --- Layouts for each column ---
     QVBoxLayout *rawLayout = new QVBoxLayout();
     rawLayout->addWidget(new QLabel("Raw Data"));
     rawLayout->addWidget(rawEdit);
-    
+
     QVBoxLayout *extractedLayout = new QVBoxLayout();
     extractedLayout->addWidget(new QLabel("Extracted Values"));
     extractedLayout->addWidget(extractedEdit);
-    
+
     QVBoxLayout *taredLayout = new QVBoxLayout();
     taredLayout->addWidget(new QLabel("Tared Values"));
     taredLayout->addWidget(taredEdit);
-    
+
     QVBoxLayout *statusLayout = new QVBoxLayout();
     statusLayout->addWidget(new QLabel("Status"));
     statusLayout->addWidget(statusEdit);
-    
 
-    
+    // --- Top row with all columns ---
     QHBoxLayout *topLayout = new QHBoxLayout();
     topLayout->addLayout(rawLayout, 1);
     topLayout->addLayout(extractedLayout, 1);
     topLayout->addLayout(taredLayout, 1);
     topLayout->addLayout(statusLayout, 1);
 
+    // --- Bottom row with controls ---
     QHBoxLayout *bottomLayout = new QHBoxLayout();
     bottomLayout->addWidget(startStopButton);
     bottomLayout->addStretch();
@@ -98,16 +104,17 @@ MainWindow::MainWindow(QWidget *parent)
     bottomLayout->addWidget(tareInput);
     bottomLayout->addWidget(tareButton);
 
+    // --- Main layout ---
     QVBoxLayout *mainLayout = new QVBoxLayout();
-    mainLayout->addLayout(topLayout, 1);
-    mainLayout->addLayout(bottomLayout, 0);
-    
+    mainLayout->addLayout(topLayout, 1);     // top layout gets extra space
+    mainLayout->addLayout(bottomLayout, 0);  // bottom layout stays compact
+
     QWidget *central = new QWidget(this);
     central->setLayout(mainLayout);
     setCentralWidget(central);
-    
 
-    // --- Center window on screen ---
+    // --- Resize window and center on screen ---
+    resize(1000, 600); // wider and taller window
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenGeometry = screen->geometry();
     move(screenGeometry.center() - rect().center());
@@ -194,7 +201,7 @@ void MainWindow::readFtdiData()
     testIndex = (testIndex + 1) % (sizeof(testLines) / sizeof(testLines[0]));
 #else
     n = ftdi_read_data(ftdi, buf, sizeof(buf));
-    printf("Read %d bytes from FTDI\n", n);
+    // printf("Read %d bytes from FTDI\n", n);
     if (n <= 0) return;
 #endif
 

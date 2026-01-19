@@ -44,8 +44,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // --- Tare input field ---
     QHBoxLayout *tareLayout = new QHBoxLayout();
-    QLabel *tareLabel = new QLabel("Tare:", this);
-    tareLayout->addWidget(tareLabel);
+    // QLabel *tareLabel = new QLabel("Taress:", this);
+    // tareLayout->addWidget(tareLabel);
 
     tareInput = new QLineEdit(this);
     tareInput->setPlaceholderText("Enter taring value");
@@ -67,49 +67,64 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // --- Layouts ---
-    QVBoxLayout *leftLayout = new QVBoxLayout();
-    leftLayout->addWidget(new QLabel("Raw Data"));
-    leftLayout->addWidget(rawEdit);
+    QVBoxLayout *rawLayout = new QVBoxLayout();
+    rawLayout->addWidget(new QLabel("Raw Data"));
+    rawLayout->addWidget(rawEdit);
+    
+    QVBoxLayout *extractedLayout = new QVBoxLayout();
+    extractedLayout->addWidget(new QLabel("Extracted Values"));
+    extractedLayout->addWidget(extractedEdit);
+    
+    QVBoxLayout *taredLayout = new QVBoxLayout();
+    taredLayout->addWidget(new QLabel("Tared Values"));
+    taredLayout->addWidget(taredEdit);
+    
+    QVBoxLayout *statusLayout = new QVBoxLayout();
+    statusLayout->addWidget(new QLabel("Status"));
+    statusLayout->addWidget(statusEdit);
+    
 
-    QVBoxLayout *middleLayout = new QVBoxLayout();
-    middleLayout->addWidget(new QLabel("Extracted Values"));
-    middleLayout->addWidget(extractedEdit);
+    
+    QHBoxLayout *topLayout = new QHBoxLayout();
+    topLayout->addLayout(rawLayout, 1);
+    topLayout->addLayout(extractedLayout, 1);
+    topLayout->addLayout(taredLayout, 1);
+    topLayout->addLayout(statusLayout, 1);
 
-    QVBoxLayout *rightLayout = new QVBoxLayout();
-    rightLayout->addWidget(new QLabel("Tared Values"));
-    rightLayout->addWidget(taredEdit);
-    rightLayout->addWidget(new QLabel("Status"));
-    rightLayout->addWidget(statusEdit);
-    rightLayout->addWidget(startStopButton);
-    rightLayout->addLayout(tareLayout);
+    QHBoxLayout *bottomLayout = new QHBoxLayout();
+    bottomLayout->addWidget(startStopButton);
+    bottomLayout->addStretch();
+    bottomLayout->addWidget(new QLabel("Tare:"));
+    bottomLayout->addWidget(tareInput);
+    bottomLayout->addWidget(tareButton);
 
-    QHBoxLayout *layout = new QHBoxLayout();
-    layout->addLayout(leftLayout, 1);
-    layout->addLayout(middleLayout, 1);
-    layout->addLayout(rightLayout, 1);
-
+    QVBoxLayout *mainLayout = new QVBoxLayout();
+    mainLayout->addLayout(topLayout, 1);
+    mainLayout->addLayout(bottomLayout, 0);
+    
     QWidget *central = new QWidget(this);
-    central->setLayout(layout);
+    central->setLayout(mainLayout);
     setCentralWidget(central);
+    
 
     // --- Center window on screen ---
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenGeometry = screen->geometry();
     move(screenGeometry.center() - rect().center());
 
-    // // --- Initialize FTDI ---
-    // ftdi = ftdi_new();
-    // if (!ftdi) {
-    //     rawEdit->append("Failed to allocate FTDI context");
-    //     return;
-    // }
+    // --- Initialize FTDI ---
+    ftdi = ftdi_new();
+    if (!ftdi) {
+        rawEdit->append("Failed to allocate FTDI context");
+        return;
+    }
 
-    // if (ftdi_usb_open(ftdi, 0x0403, 0x6001) < 0) {
-    //     rawEdit->append(ftdi_get_error_string(ftdi));
-    //     return;
-    // }
+    if (ftdi_usb_open(ftdi, 0x0403, 0x6001) < 0) {
+        rawEdit->append(ftdi_get_error_string(ftdi));
+        return;
+    }
 
-    // ftdi_set_baudrate(ftdi, 9600);
+    ftdi_set_baudrate(ftdi, 9600);
 
     // --- Timer to poll FTDI ---
     timer = new QTimer(this);
@@ -117,19 +132,19 @@ MainWindow::MainWindow(QWidget *parent)
     timer->start(50);
 
     // --- Timer for colored OK messages ---
-    okTimer = new QTimer(this);
-    connect(okTimer, &QTimer::timeout, this, [this]() {
-        static int colorIndex = 0;
-        const QStringList colors = {"green", "red", "blue"};
-        QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+    // okTimer = new QTimer(this);
+    // connect(okTimer, &QTimer::timeout, this, [this]() {
+    //     static int colorIndex = 0;
+    //     const QStringList colors = {"green", "red", "blue"};
+    //     QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
 
-        statusEdit->append(QString("<span style=\"color:%1;\">[%2] OK</span>")
-                           .arg(colors[colorIndex])
-                           .arg(ts));
+    //     statusEdit->append(QString("<span style=\"color:%1;\">[%2] OK</span>")
+    //                        .arg(colors[colorIndex])
+    //                        .arg(ts));
 
-        colorIndex = (colorIndex + 1) % colors.size();
-    });
-    okTimer->start(1000);
+    //     colorIndex = (colorIndex + 1) % colors.size();
+    // });
+    // okTimer->start(1000);
 
     tareValue = 0;
 }
@@ -144,18 +159,24 @@ MainWindow::~MainWindow()
     }
 }
 
-#define DEBUG_FTDI
+// #define DEBUG_FTDI
 
 void MainWindow::readFtdiData()
 {
-
     if (!readingEnabled)
         return;
 
-    static int byteCount = 0;
-    static uint8_t bytes[3];
-    int n = 0;
+    enum {
+        EXPECT_12,
+        EXPECT_13,
+        EXPECT_14
+    };
 
+    static int state = EXPECT_12;
+    static uint8_t bytes[3];
+    static QString tripletTimestamp;
+
+    int n = 0;
     unsigned char buf[256];
 
 #ifdef DEBUG_FTDI
@@ -173,6 +194,7 @@ void MainWindow::readFtdiData()
     testIndex = (testIndex + 1) % (sizeof(testLines) / sizeof(testLines[0]));
 #else
     n = ftdi_read_data(ftdi, buf, sizeof(buf));
+    printf("Read %d bytes from FTDI\n", n);
     if (n <= 0) return;
 #endif
 
@@ -181,36 +203,66 @@ void MainWindow::readFtdiData()
 
     for (const QByteArray &line : lines) {
         QString strLine = QString::fromUtf8(line).trimmed();
-        if (!strLine.startsWith("[2AW"))
+
+        if (!strLine.startsWith("[2AWA"))
             continue;
 
         QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+
+        // ---- RAW WINDOW ----
         rawEdit->append(QString("[%1] %2").arg(timestamp, strLine));
 
+        // ---- Extract data byte ----
         int rIndex = strLine.indexOf("[2AR");
-        if (rIndex == -1 || rIndex + 5 >= strLine.length())
+        if (rIndex == -1 || rIndex + 5 >= strLine.length()) {
+            state = EXPECT_12;
+            statusEdit->append("Could not extract value");
             continue;
+        }
 
         QString byteStr = strLine.mid(rIndex + 4, 2);
         bool ok;
         uint8_t value = byteStr.toUInt(&ok, 16);
-        if (!ok) continue;
+        if (!ok) {
+            state = EXPECT_12;
+            statusEdit->append("Could not extract value");
+            continue;
+        }
 
-        if (byteCount < 3)
-            bytes[byteCount++] = value;
+        // ---- State machine ----
+        if (state == EXPECT_12 && strLine.startsWith("[2AWA12A")) {
+            bytes[0] = value;
+            tripletTimestamp = timestamp;
+            state = EXPECT_13;
+        }
+        else if (state == EXPECT_13 && strLine.startsWith("[2AWA13A")) {
+            bytes[1] = value;
+            state = EXPECT_14;
+        }
+        else if (state == EXPECT_14 && strLine.startsWith("[2AWA14A")) {
+            bytes[2] = value;
 
-        if (byteCount == 3) {
-            int32_t result = (bytes[0] << 16) |
-                             (bytes[1] << 8)  |
-                              bytes[2];
+            // ---- Complete triplet ----
+            int32_t result =
+                (bytes[0] << 16) |
+                (bytes[1] << 8)  |
+                 bytes[2];
 
-            QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
-            extractedEdit->append(QString("[%1] %2").arg(ts).arg(result));
+            extractedEdit->append(
+                QString("[%1] %2").arg(tripletTimestamp).arg(result)
+            );
 
             int tared = result - tareValue;
-            taredEdit->append(QString("[%1] %2").arg(ts).arg(tared));
+            taredEdit->append(
+                QString("[%1] %2").arg(tripletTimestamp).arg(tared)
+            );
 
-            byteCount = 0;
+            state = EXPECT_12;
+        }
+        else {
+            // ---- Broken sequence ----
+            state = EXPECT_12;
+            statusEdit->append("Broken sequence, could not extract value");
         }
     }
 }

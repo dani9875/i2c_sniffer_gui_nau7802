@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       readingEnabled(false),
       scalingFactor(399835),
-      tareValue(0)
+      tareValue(2460000)
 {
     // --- Raw data window ---
     rawEdit = new QTextEdit(this);
@@ -79,13 +79,16 @@ MainWindow::MainWindow(QWidget *parent)
     // --- Tare input field ---
     QHBoxLayout *tareLayout = new QHBoxLayout();
 
+    tareButton = new QPushButton("Set Tare:", this);
+    tareLayout->addWidget(tareButton);
+
     tareInput = new QLineEdit(this);
     tareInput->setPlaceholderText("Enter taring value");
     tareInput->setMaximumWidth(100);
     tareLayout->addWidget(tareInput);
+    tareInput->setText(QString::number(tareValue));
 
-    tareButton = new QPushButton("Set Tare", this);
-    tareLayout->addWidget(tareButton);
+
 
     connect(tareButton, &QPushButton::clicked, this, [this]() {
         bool ok;

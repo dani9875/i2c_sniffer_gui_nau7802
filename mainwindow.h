@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <ftdi.h>
 #include <QLineEdit> 
+#include <QPushButton>
 
 class MainWindow : public QMainWindow
 {
@@ -20,10 +21,17 @@ private slots:
 private:
     QTextEdit *textEdit;
     QTextEdit *statusEdit;
+    QTextEdit *rawEdit;
+    QTextEdit *extractedEdit;
+    QTextEdit *taredEdit;
+
     QTimer *timer;
     QTimer *okTimer;
     struct ftdi_context *ftdi;
 
     QLineEdit *tareInput;
-    double tareValue;
+    int tareValue;
+
+    QPushButton *startStopButton;
+    bool readingEnabled;
 };

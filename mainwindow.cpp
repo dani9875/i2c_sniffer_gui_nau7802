@@ -9,28 +9,11 @@
 #include <QScreen>
 #include <QGuiApplication>
 
-void MainWindow::updateScalingValues()
-{
-    scalingEdit->clear();
-
-    // read all tared values line by line
-    QStringList lines = taredEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        bool ok;
-        double taredVal = line.toDouble(&ok);
-        if (ok) {
-            double scaled = (taredVal / scalingFactor) * 1000.0;
-            scalingEdit->append(QString::number(scaled, 'f', 3));
-        }
-    }
-}
-
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       readingEnabled(false),
       scalingFactor(399835),
-      tareValue(2460000)
+      tareValue(2625000)
 {
     // --- Raw data window ---
     rawEdit = new QTextEdit(this);
@@ -38,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     rawEdit->setPlaceholderText("Raw FTDI data");
     rawEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     rawEdit->setMinimumHeight(300);
+    rawEdit->setMinimumWidth(400);
 
     // --- Extracted values window ---
     extractedEdit = new QTextEdit(this);
@@ -96,7 +80,6 @@ MainWindow::MainWindow(QWidget *parent)
         if (ok) {
             tareValue = value;
             statusEdit->append(QString("Tare set to %1").arg(tareValue));
-            // updateScalingValues(); // update scaling column
         } else {
             statusEdit->append("Invalid taring value");
         }
@@ -118,7 +101,6 @@ MainWindow::MainWindow(QWidget *parent)
         if (ok && value != 0) {
             scalingFactor = value;
             statusEdit->append(QString("Scaling factor set to %1").arg(scalingFactor));
-            // updateScalingValues(); // recalc immediately
         } else {
             statusEdit->append("Invalid scaling factor");
         }
@@ -220,7 +202,7 @@ MainWindow::~MainWindow()
     }
 }
 
-#define DEBUG_FTDI
+// #define DEBUG_FTDI
 
 void MainWindow::readFtdiData()
 {

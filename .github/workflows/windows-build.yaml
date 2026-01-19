@@ -1,8 +1,14 @@
 name: Build FTDI_Viewer Windows
 
+
+permissions:
+  contents: write
+  
 on:
   push:
     branches: [main]
+    tags:
+      - '*'
   pull_request:
     branches: [main]
 
@@ -15,10 +21,8 @@ jobs:
         config: [Release]
 
     steps:
-      # 1. Checkout repository
       - uses: actions/checkout@v4
 
-      # 2. Install MSYS2 for MinGW
       - name: Install MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -29,7 +33,6 @@ jobs:
             mingw-w64-x86_64-make
             mingw-w64-x86_64-pkg-config
 
-      # 3. Install Qt 6.10.1 (MinGW) using your preferred action
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
@@ -39,27 +42,36 @@ jobs:
           target: 'desktop'
           arch: 'win64_mingw'
 
-      # 4. Prepare MSYS2 shell for building
-      - name: Setup MSYS2 shell
-        shell: msys2 {0}
-        run: echo "MSYS2 shell ready"
-
-      # 5. Configure CMake
       - name: Configure CMake
         shell: msys2 {0}
         run: |
           mkdir -p build
           cmake -S . -B build -G "MinGW Makefiles"
 
-      # 6. Build the project
       - name: Build
         shell: msys2 {0}
         run: |
           cmake --build build --config ${{ matrix.config }}
 
-      # 7. Upload the built executable
-      - name: Upload executable
+      # Always upload CI artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FTDI_Viewer
+          name: FTDI_Viewer-Windows
           path: build/
+
+      - name: Create release zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build\* -DestinationPath build\FTDI_Viewer-Windows.zip
+
+      # Create release + attach ZIP ONLY for tags
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: build/FTDI_Viewer-Windows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}

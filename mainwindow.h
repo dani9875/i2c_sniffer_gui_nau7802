@@ -14,6 +14,8 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    void updateScalingValues();
+
 
 private slots:
     void readFtdiData();
@@ -24,14 +26,21 @@ private:
     QTextEdit *rawEdit;
     QTextEdit *extractedEdit;
     QTextEdit *taredEdit;
+    QTextEdit *scalingEdit;
 
     QTimer *timer;
     QTimer *okTimer;
     struct ftdi_context *ftdi;
 
     QLineEdit *tareInput;
+    QPushButton *tareButton;
     int tareValue;
 
     QPushButton *startStopButton;
+
+    QLineEdit *scalingFactorInput; // user can edit scaling factor
+    QPushButton *scalingFactorButton;
+    int scalingFactor;
+
     bool readingEnabled;
 };

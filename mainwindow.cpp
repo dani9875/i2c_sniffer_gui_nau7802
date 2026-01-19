@@ -5,13 +5,32 @@
 #include <QDateTime>
 #include <QLabel>
 #include <QPushButton>
-
+#include <QLineEdit>
 #include <QScreen>
 #include <QGuiApplication>
 
+void MainWindow::updateScalingValues()
+{
+    scalingEdit->clear();
+
+    // read all tared values line by line
+    QStringList lines = taredEdit->toPlainText().split('\n', Qt::SkipEmptyParts);
+    for (const QString &line : lines) {
+        bool ok;
+        double taredVal = line.toDouble(&ok);
+        if (ok) {
+            double scaled = (taredVal / scalingFactor) * 1000.0;
+            scalingEdit->append(QString::number(scaled, 'f', 3));
+        }
+    }
+}
+
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
-      readingEnabled(false)
+      readingEnabled(false),
+      scalingFactor(399835),
+      tareValue(0)
 {
     // --- Raw data window ---
     rawEdit = new QTextEdit(this);
@@ -33,6 +52,13 @@ MainWindow::MainWindow(QWidget *parent)
     taredEdit->setPlaceholderText("Tared values");
     taredEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     taredEdit->setMinimumHeight(300);
+
+    // --- Scaling values window ---
+    scalingEdit = new QTextEdit(this);
+    scalingEdit->setReadOnly(true);
+    scalingEdit->setPlaceholderText("Scaling values");
+    scalingEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    scalingEdit->setMinimumHeight(300);
 
     // --- Status pane ---
     statusEdit = new QTextEdit(this);
@@ -58,7 +84,7 @@ MainWindow::MainWindow(QWidget *parent)
     tareInput->setMaximumWidth(100);
     tareLayout->addWidget(tareInput);
 
-    QPushButton *tareButton = new QPushButton("Set Tare", this);
+    tareButton = new QPushButton("Set Tare", this);
     tareLayout->addWidget(tareButton);
 
     connect(tareButton, &QPushButton::clicked, this, [this]() {
@@ -67,8 +93,31 @@ MainWindow::MainWindow(QWidget *parent)
         if (ok) {
             tareValue = value;
             statusEdit->append(QString("Tare set to %1").arg(tareValue));
+            // updateScalingValues(); // update scaling column
         } else {
             statusEdit->append("Invalid taring value");
+        }
+    });
+
+    // --- Scaling factor input field ---
+    scalingFactorInput = new QLineEdit(this);
+    scalingFactorInput->setMaximumWidth(120);
+    scalingFactorInput->setText(QString::number(scalingFactor));
+
+    scalingFactorButton = new QPushButton("Apply", this);
+    tareLayout->addWidget(new QLabel("Scaling Factor:"));
+    tareLayout->addWidget(scalingFactorInput);
+    tareLayout->addWidget(scalingFactorButton);
+
+    connect(scalingFactorButton, &QPushButton::clicked, this, [this]() {
+        bool ok;
+        int value = scalingFactorInput->text().toInt(&ok);
+        if (ok && value != 0) {
+            scalingFactor = value;
+            statusEdit->append(QString("Scaling factor set to %1").arg(scalingFactor));
+            // updateScalingValues(); // recalc immediately
+        } else {
+            statusEdit->append("Invalid scaling factor");
         }
     });
 
@@ -85,6 +134,10 @@ MainWindow::MainWindow(QWidget *parent)
     taredLayout->addWidget(new QLabel("Tared Values"));
     taredLayout->addWidget(taredEdit);
 
+    QVBoxLayout *scalingLayout = new QVBoxLayout();
+    scalingLayout->addWidget(new QLabel("Weight in grams"));
+    scalingLayout->addWidget(scalingEdit);
+
     QVBoxLayout *statusLayout = new QVBoxLayout();
     statusLayout->addWidget(new QLabel("Status"));
     statusLayout->addWidget(statusEdit);
@@ -94,15 +147,14 @@ MainWindow::MainWindow(QWidget *parent)
     topLayout->addLayout(rawLayout, 1);
     topLayout->addLayout(extractedLayout, 1);
     topLayout->addLayout(taredLayout, 1);
+    topLayout->addLayout(scalingLayout, 1);
     topLayout->addLayout(statusLayout, 1);
 
     // --- Bottom row with controls ---
     QHBoxLayout *bottomLayout = new QHBoxLayout();
     bottomLayout->addWidget(startStopButton);
     bottomLayout->addStretch();
-    bottomLayout->addWidget(new QLabel("Tare:"));
-    bottomLayout->addWidget(tareInput);
-    bottomLayout->addWidget(tareButton);
+    bottomLayout->addLayout(tareLayout);
 
     // --- Main layout ---
     QVBoxLayout *mainLayout = new QVBoxLayout();
@@ -114,7 +166,7 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(central);
 
     // --- Resize window and center on screen ---
-    resize(1000, 600); // wider and taller window
+    resize(1200, 600); // wider to fit new column
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenGeometry = screen->geometry();
     move(screenGeometry.center() - rect().center());
@@ -152,9 +204,8 @@ MainWindow::MainWindow(QWidget *parent)
     //     colorIndex = (colorIndex + 1) % colors.size();
     // });
     // okTimer->start(1000);
-
-    tareValue = 0;
 }
+
 
 MainWindow::~MainWindow()
 {
@@ -166,7 +217,7 @@ MainWindow::~MainWindow()
     }
 }
 
-// #define DEBUG_FTDI
+#define DEBUG_FTDI
 
 void MainWindow::readFtdiData()
 {
@@ -262,6 +313,10 @@ void MainWindow::readFtdiData()
             int tared = result - tareValue;
             taredEdit->append(
                 QString("[%1] %2").arg(tripletTimestamp).arg(tared)
+            );
+
+            scalingEdit->append(
+                QString("[%1] %2").arg(tripletTimestamp).arg((tared / scalingFactor) * 1.0, 0, 'f', 3)
             );
 
             state = EXPECT_12;

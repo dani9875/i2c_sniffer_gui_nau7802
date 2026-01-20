@@ -259,16 +259,16 @@ void MainWindow::readFtdiData()
         int rIndex = strLine.indexOf("[2AR");
         if (rIndex == -1 || rIndex + 5 >= strLine.length()) {
             state = EXPECT_12;
-            statusEdit->append("Could not extract value");
+            // statusEdit->append("Could not extract value");
             continue;
         }
 
-        QString byteStr = strLine.mid(rIndex + 4, 2);
+        QString byteStr = strLine.mid(rIndex + 5, 2);
         bool ok;
         uint8_t value = byteStr.toUInt(&ok, 16);
         if (!ok) {
             state = EXPECT_12;
-            statusEdit->append("Could not extract value");
+            // statusEdit->append("Could not extract value");
             continue;
         }
 
@@ -286,11 +286,12 @@ void MainWindow::readFtdiData()
             bytes[2] = value;
 
             // ---- Complete triplet ----
-            int32_t result =
+            uint32_t result =
                 (bytes[0] << 16) |
                 (bytes[1] << 8)  |
                  bytes[2];
 
+            result *= 1000;
             extractedEdit->append(
                 QString("[%1] %2").arg(tripletTimestamp).arg(result)
             );
@@ -300,8 +301,10 @@ void MainWindow::readFtdiData()
                 QString("[%1] %2").arg(tripletTimestamp).arg(tared)
             );
 
+            float grams = (static_cast<float>(tared) / static_cast<float>(scalingFactor));
+
             scalingEdit->append(
-                QString("[%1] %2").arg(tripletTimestamp).arg((tared / scalingFactor) * 1.0, 0, 'f', 3)
+                QString("[%1] %2").arg(tripletTimestamp).arg(grams, 0, 'f', 3)
             );
 
             state = EXPECT_12;
@@ -309,7 +312,7 @@ void MainWindow::readFtdiData()
         else {
             // ---- Broken sequence ----
             state = EXPECT_12;
-            statusEdit->append("Broken sequence, could not extract value");
+            // statusEdit->append("Broken sequence, could not extract value");
         }
     }
 }

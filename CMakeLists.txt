@@ -27,6 +27,7 @@ set(CMAKE_AUTORCC ON)
 add_executable(FTDI_Viewer
     main.cpp
     mainwindow.cpp
+    ftdireader.cpp
 )
 
 # ---------------------------------------------------------

@@ -2,42 +2,51 @@
 
 #include <QMainWindow>
 #include <QTextEdit>
-#include <QTimer>
-#include <ftdi.h>
-#include <QLineEdit> 
 #include <QPushButton>
+#include <QLineEdit>
+#include <QThread>
+#include <ftdi.h>
+
+#include "ftdireader.h"
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
 private slots:
-    void readFtdiData();
+    void onFtdiBytes(const QByteArray &data);
+    void processLine(const QByteArray &line);
 
 private:
-    QTextEdit *textEdit;
-    QTextEdit *statusEdit;
+    // UI
     QTextEdit *rawEdit;
     QTextEdit *extractedEdit;
     QTextEdit *taredEdit;
     QTextEdit *scalingEdit;
-
-    QTimer *timer;
-    QTimer *okTimer;
-    struct ftdi_context *ftdi;
-
-    QLineEdit *tareInput;
-    QPushButton *tareButton;
-    int tareValue;
+    QTextEdit *statusEdit;
 
     QPushButton *startStopButton;
-
-    QLineEdit *scalingFactorInput; // user can edit scaling factor
+    QPushButton *tareButton;
     QPushButton *scalingFactorButton;
-    int scalingFactor;
+    QLineEdit *tareInput;
+    QLineEdit *scalingFactorInput;
 
+    // State
     bool readingEnabled;
+    int scalingFactor;
+    int tareValue;
+
+    // FTDI
+    ftdi_context *ftdi;
+
+    // Threading
+    QThread *readerThread;
+    FtdiReader *reader;
+
+    // RX buffer
+    QByteArray rxBuffer;
 };

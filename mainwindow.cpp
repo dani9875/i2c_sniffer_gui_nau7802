@@ -168,12 +168,12 @@ MainWindow::MainWindow(QWidget *parent)
         return;
     }
 
-    ftdi_set_baudrate(ftdi, 9600);
+    ftdi_set_baudrate(ftdi, 921600);
 
     // --- Timer to poll FTDI ---
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::readFtdiData);
-    timer->start(50);
+    timer->start(10);
 
     // --- Timer for colored OK messages ---
     // okTimer = new QTimer(this);
@@ -220,7 +220,7 @@ void MainWindow::readFtdiData()
     static QString tripletTimestamp;
 
     int n = 0;
-    unsigned char buf[256];
+    unsigned char buf[16384];
 
 #ifdef DEBUG_FTDI
     static const char *testLines[] = {

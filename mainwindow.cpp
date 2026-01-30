@@ -1,20 +1,14 @@
 #include "mainwindow.h"
-
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QDateTime>
 #include <QLabel>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QRegularExpression>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
-      readingEnabled(false),
-      scalingFactor(399835),
-      tareValue(2625000),
-      ftdi(nullptr),
-      readerThread(nullptr),
-      reader(nullptr)
+    : QMainWindow(parent)
 {
     rawEdit = new QTextEdit(this);
     extractedEdit = new QTextEdit(this);
@@ -22,45 +16,39 @@ MainWindow::MainWindow(QWidget *parent)
     scalingEdit = new QTextEdit(this);
     statusEdit = new QTextEdit(this);
 
-    rawEdit->setReadOnly(true);
-    extractedEdit->setReadOnly(true);
-    taredEdit->setReadOnly(true);
-    scalingEdit->setReadOnly(true);
-    statusEdit->setReadOnly(true);
+    for (auto e : {rawEdit, extractedEdit, taredEdit, scalingEdit, statusEdit})
+        e->setReadOnly(true);
 
     startStopButton = new QPushButton("Start", this);
     startStopButton->setCheckable(true);
 
-    connect(startStopButton, &QPushButton::toggled, this, [this](bool checked) {
-        readingEnabled = checked;
-        startStopButton->setText(checked ? "Stop" : "Start");
-    });
+    connect(startStopButton, &QPushButton::toggled, this, [this](bool on) {
+        readingEnabled = on;
+        startStopButton->setText(on ? "Stop" : "Start");
 
-    tareButton = new QPushButton("Set Tare:", this);
-    tareInput = new QLineEdit(QString::number(tareValue), this);
-
-    connect(tareButton, &QPushButton::clicked, this, [this]() {
-        bool ok;
-        int v = tareInput->text().toInt(&ok);
-        if (ok) tareValue = v;
+        if (on) {
+            python.start("python3", {"-u", "test1.py", deviceArg});
+            statusEdit->append("Python started with argument: " + deviceArg);
+        } else {
+            python.terminate();
+            python.waitForFinished(1000);
+            statusEdit->append("Python stopped");
+        }
     });
 
     scalingFactorInput = new QLineEdit(QString::number(scalingFactor), this);
-    scalingFactorButton = new QPushButton("Apply", this);
 
-    connect(scalingFactorButton, &QPushButton::clicked, this, [this]() {
+    connect(scalingFactorInput, &QLineEdit::editingFinished, this, [this]() {
         bool ok;
         int v = scalingFactorInput->text().toInt(&ok);
-        if (ok && v != 0) scalingFactor = v;
+        if (ok && v != 0)
+            scalingFactor = v;
     });
 
     QHBoxLayout *controls = new QHBoxLayout();
     controls->addWidget(startStopButton);
-    controls->addWidget(tareButton);
-    controls->addWidget(tareInput);
     controls->addWidget(new QLabel("Scaling:"));
     controls->addWidget(scalingFactorInput);
-    controls->addWidget(scalingFactorButton);
 
     QHBoxLayout *top = new QHBoxLayout();
     top->addWidget(rawEdit);
@@ -80,111 +68,46 @@ MainWindow::MainWindow(QWidget *parent)
     resize(1200, 600);
     move(QGuiApplication::primaryScreen()->geometry().center() - rect().center());
 
-    // ---- FTDI init ----
-    ftdi = ftdi_new();
-    if (!ftdi) return;
-
-    if (ftdi_usb_open(ftdi, 0x0403, 0x6001) < 0) return;
-    ftdi_set_baudrate(ftdi, 921600);
-
-    readerThread = new QThread(this);
-    reader = new FtdiReader(ftdi);
-
-    reader->moveToThread(readerThread);
-
-    connect(readerThread, &QThread::started, reader, &FtdiReader::start);
-    connect(readerThread, &QThread::finished, reader, &QObject::deleteLater);
-    connect(this, &MainWindow::destroyed, reader, &FtdiReader::stop);
-    connect(reader, &FtdiReader::bytesReceived, this, &MainWindow::onFtdiBytes);
-
-    readerThread->start();
+    connect(&python, &QProcess::readyReadStandardOutput,
+            this, &MainWindow::handleStdout);
 }
 
 MainWindow::~MainWindow()
 {
-    if (readerThread) {
-        reader->stop();
-        readerThread->quit();
-        readerThread->wait();
-    }
-
-    if (ftdi) {
-        ftdi_usb_close(ftdi);
-        ftdi_free(ftdi);
-    }
+    python.terminate();
+    python.waitForFinished(500);
 }
 
-void MainWindow::onFtdiBytes(const QByteArray &data)
+void MainWindow::handleStdout()
 {
-    if (!readingEnabled)
-        return;
-
-    rxBuffer.append(data);
+    rxBuffer.append(python.readAllStandardOutput());
 
     int idx;
     while ((idx = rxBuffer.indexOf('\n')) != -1) {
         QByteArray line = rxBuffer.left(idx);
         rxBuffer.remove(0, idx + 1);
-        processLine(line);
+        processLine(QString::fromUtf8(line).trimmed());
     }
 }
 
-void MainWindow::processLine(const QByteArray &line)
+void MainWindow::processLine(const QString &line)
 {
-    static enum { EXPECT_12, EXPECT_13, EXPECT_14 } state = EXPECT_12;
-    static uint8_t bytes[3];
-    static QString tripletTimestamp;
-
-    QString strLine = QString::fromUtf8(line).trimmed();
-    if (!strLine.startsWith("[2AWA"))
+    if (!readingEnabled)
         return;
 
-    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
-    rawEdit->append(QString("[%1] %2").arg(timestamp, strLine));
-
-    int rIndex = strLine.indexOf("[2AR");
-    if (rIndex == -1 || rIndex + 5 >= strLine.length()) {
-        state = EXPECT_12;
+    static QRegularExpression re(R"(Load Cell Reading:\s*(-?\d+))");
+    auto m = re.match(line);
+    if (!m.hasMatch())
         return;
-    }
 
-    bool ok;
-    uint8_t value = strLine.mid(rIndex + 5, 2).toUInt(&ok, 16);
-    if (!ok) {
-        state = EXPECT_12;
-        return;
-    }
+    int raw = m.captured(1).toInt();
+    int tared = raw;
+    float grams = static_cast<float>(tared) / scalingFactor;
 
-    if (state == EXPECT_12 && strLine.startsWith("[2AWA12A")) {
-        bytes[0] = value;
-        tripletTimestamp = timestamp;
-        state = EXPECT_13;
-    }
-    else if (state == EXPECT_13 && strLine.startsWith("[2AWA13A")) {
-        bytes[1] = value;
-        state = EXPECT_14;
-    }
-    else if (state == EXPECT_14 && strLine.startsWith("[2AWA14A")) {
-        bytes[2] = value;
+    QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
 
-        uint32_t result =
-            (bytes[0] << 16) |
-            (bytes[1] << 8) |
-             bytes[2];
-
-        result *= 1000;
-
-        extractedEdit->append(QString("[%1] %2").arg(tripletTimestamp).arg(result));
-
-        int tared = result - tareValue;
-        taredEdit->append(QString("[%1] %2").arg(tripletTimestamp).arg(tared));
-
-        float grams = static_cast<float>(tared) / scalingFactor;
-        scalingEdit->append(QString("[%1] %2").arg(tripletTimestamp).arg(grams, 0, 'f', 3));
-
-        state = EXPECT_12;
-    }
-    else {
-        state = EXPECT_12;
-    }
+    rawEdit->append(QString("[%1] %2").arg(ts, line));
+    extractedEdit->append(QString("[%1] %2").arg(ts).arg(raw));
+    taredEdit->append(QString("[%1] %2").arg(ts).arg(tared));
+    scalingEdit->append(QString("[%1] %2").arg(ts).arg(grams, 0, 'f', 3));
 }

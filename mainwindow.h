@@ -4,10 +4,7 @@
 #include <QTextEdit>
 #include <QPushButton>
 #include <QLineEdit>
-#include <QThread>
-#include <ftdi.h>
-
-#include "ftdireader.h"
+#include <QProcess>
 
 class MainWindow : public QMainWindow
 {
@@ -18,11 +15,11 @@ public:
     ~MainWindow();
 
 private slots:
-    void onFtdiBytes(const QByteArray &data);
-    void processLine(const QByteArray &line);
+    void handleStdout();
 
 private:
-    // UI
+    void processLine(const QString &line);
+
     QTextEdit *rawEdit;
     QTextEdit *extractedEdit;
     QTextEdit *taredEdit;
@@ -30,23 +27,13 @@ private:
     QTextEdit *statusEdit;
 
     QPushButton *startStopButton;
-    QPushButton *tareButton;
-    QPushButton *scalingFactorButton;
-    QLineEdit *tareInput;
     QLineEdit *scalingFactorInput;
 
-    // State
-    bool readingEnabled;
-    int scalingFactor;
-    int tareValue;
-
-    // FTDI
-    ftdi_context *ftdi;
-
-    // Threading
-    QThread *readerThread;
-    FtdiReader *reader;
-
-    // RX buffer
+    QProcess python;
     QByteArray rxBuffer;
+
+    bool readingEnabled = false;
+    int scalingFactor = 399835;
+
+    QString deviceArg = "NRF52833_xxAA"; // device argument
 };

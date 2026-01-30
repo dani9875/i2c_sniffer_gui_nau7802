@@ -20,20 +20,24 @@ private slots:
 private:
     void processLine(const QString &line);
 
-    QTextEdit *rawEdit;
-    QTextEdit *extractedEdit;
-    QTextEdit *taredEdit;
-    QTextEdit *scalingEdit;
-    QTextEdit *statusEdit;
+    // --- Display widgets ---
+    QTextEdit *rawEdit;          // Top-left: combined RTT + state
+    QTextEdit *extractedEdit;    // Right: extracted values
+    QTextEdit *scalingEdit;      // Right: scaled weight
+    QTextEdit *taredEdit;        // Bottom-left: current weight
+    QLineEdit *prevStateField;   // Bottom-left: previous state
+    QLineEdit *currStateField;   // Bottom-left: current state
 
+    // --- Controls ---
     QPushButton *startStopButton;
     QLineEdit *scalingFactorInput;
 
+    // --- Process and buffer ---
     QProcess python;
     QByteArray rxBuffer;
 
+    // --- State ---
     bool readingEnabled = false;
     int scalingFactor = 399835;
-
     QString deviceArg = "NRF52833_xxAA"; // device argument
 };

@@ -10,66 +10,82 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    rawEdit = new QTextEdit(this);
-    extractedEdit = new QTextEdit(this);
-    taredEdit = new QTextEdit(this);
-    scalingEdit = new QTextEdit(this);
-    statusEdit = new QTextEdit(this);
+    // --- Main displays ---
+    rawEdit = new QTextEdit(this);          // Top-left: combined RTT + state
+    extractedEdit = new QTextEdit(this);    // Right: extracted
+    scalingEdit = new QTextEdit(this);      // Right: scaled weight
+    prevStateField = new QLineEdit(this);   // Bottom-left row: prev state
+    currStateField = new QLineEdit(this);   // Bottom-left row: current state
+    taredEdit = new QTextEdit(this);        // Bottom-left row: current weight
 
-    for (auto e : {rawEdit, extractedEdit, taredEdit, scalingEdit, statusEdit})
-        e->setReadOnly(true);
+    rawEdit->setReadOnly(true);
+    extractedEdit->setReadOnly(true);
+    scalingEdit->setReadOnly(true);
+    taredEdit->setReadOnly(true);
+    prevStateField->setReadOnly(true);
+    currStateField->setReadOnly(true);
 
+    prevStateField->setMaximumWidth(150);
+    currStateField->setMaximumWidth(150);
+    taredEdit->setMaximumWidth(150);
+
+    // --- Start/Stop button and scaling ---
     startStopButton = new QPushButton("Start", this);
     startStopButton->setCheckable(true);
-
-    connect(startStopButton, &QPushButton::toggled, this, [this](bool on) {
-        readingEnabled = on;
-        startStopButton->setText(on ? "Stop" : "Start");
-
-        if (on) {
-            python.start("python3", {"-u", "test1.py", deviceArg});
-            statusEdit->append("Python started with argument: " + deviceArg);
-        } else {
-            python.terminate();
-            python.waitForFinished(1000);
-            statusEdit->append("Python stopped");
-        }
-    });
-
     scalingFactorInput = new QLineEdit(QString::number(scalingFactor), this);
-
     connect(scalingFactorInput, &QLineEdit::editingFinished, this, [this]() {
         bool ok;
         int v = scalingFactorInput->text().toInt(&ok);
-        if (ok && v != 0)
-            scalingFactor = v;
+        if (ok && v != 0) scalingFactor = v;
     });
 
-    QHBoxLayout *controls = new QHBoxLayout();
-    controls->addWidget(startStopButton);
-    controls->addWidget(new QLabel("Scaling:"));
-    controls->addWidget(scalingFactorInput);
+    connect(startStopButton, &QPushButton::toggled, this, [this](bool on){
+        readingEnabled = on;
+        startStopButton->setText(on ? "Stop" : "Start");
+        if (on) {
+            python.start("python3", {"-u", "test1.py", deviceArg});
+            rawEdit->append("Python started with argument: " + deviceArg);
+        } else {
+            python.terminate();
+            python.waitForFinished(1000);
+            rawEdit->append("Python stopped");
+        }
+    });
 
-    QHBoxLayout *top = new QHBoxLayout();
-    top->addWidget(rawEdit);
-    top->addWidget(extractedEdit);
-    top->addWidget(taredEdit);
-    top->addWidget(scalingEdit);
-    top->addWidget(statusEdit);
+    // --- Layouts ---
+    QHBoxLayout *stateRow = new QHBoxLayout();
+    stateRow->addWidget(new QLabel("Prev State:"));
+    stateRow->addWidget(prevStateField);
+    stateRow->addWidget(new QLabel("Curr State:"));
+    stateRow->addWidget(currStateField);
+    stateRow->addWidget(new QLabel("Current Weight:"));
+    stateRow->addWidget(taredEdit);
 
-    QVBoxLayout *main = new QVBoxLayout();
-    main->addLayout(top);
-    main->addLayout(controls);
+    QVBoxLayout *leftBlock = new QVBoxLayout();
+    leftBlock->addWidget(rawEdit);   // Top large RTT display
+    leftBlock->addLayout(stateRow);  // Bottom row with prev/curr states and current weight
+
+    QHBoxLayout *mainLayout = new QHBoxLayout();
+    mainLayout->addLayout(leftBlock);
+    mainLayout->addWidget(extractedEdit);
+    mainLayout->addWidget(scalingEdit);
+
+    QVBoxLayout *controls = new QVBoxLayout();
+    controls->addLayout(mainLayout);
+    QHBoxLayout *bottomControls = new QHBoxLayout();
+    bottomControls->addWidget(startStopButton);
+    bottomControls->addWidget(new QLabel("Scaling:"));
+    bottomControls->addWidget(scalingFactorInput);
+    controls->addLayout(bottomControls);
 
     QWidget *central = new QWidget(this);
-    central->setLayout(main);
+    central->setLayout(controls);
     setCentralWidget(central);
 
-    resize(1200, 600);
+    resize(1400, 700);
     move(QGuiApplication::primaryScreen()->geometry().center() - rect().center());
 
-    connect(&python, &QProcess::readyReadStandardOutput,
-            this, &MainWindow::handleStdout);
+    connect(&python, &QProcess::readyReadStandardOutput, this, &MainWindow::handleStdout);
 }
 
 MainWindow::~MainWindow()
@@ -92,22 +108,38 @@ void MainWindow::handleStdout()
 
 void MainWindow::processLine(const QString &line)
 {
-    if (!readingEnabled)
-        return;
-
-    static QRegularExpression re(R"(Load Cell Reading:\s*(-?\d+))");
-    auto m = re.match(line);
-    if (!m.hasMatch())
-        return;
-
-    int raw = m.captured(1).toInt();
-    int tared = raw;
-    float grams = static_cast<float>(tared) / scalingFactor;
+    if (!readingEnabled) return;
 
     QString ts = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
 
-    rawEdit->append(QString("[%1] %2").arg(ts, line));
-    extractedEdit->append(QString("[%1] %2").arg(ts).arg(raw));
-    taredEdit->append(QString("[%1] %2").arg(ts).arg(tared));
-    scalingEdit->append(QString("[%1] %2").arg(ts).arg(grams, 0, 'f', 3));
+    // --- Load Cell Reading ---
+    static QRegularExpression reLoad(R"(Load Cell Reading:\s*(-?\d+))");
+    auto mLoad = reLoad.match(line);
+    int raw = 0;
+    int tared = 0;
+    float grams = 0.0f;
+
+    if (mLoad.hasMatch()) {
+        raw = mLoad.captured(1).toInt();
+        tared = raw;  // assuming already tared
+        grams = static_cast<float>(tared) / scalingFactor;
+
+        rawEdit->append(QString("[%1] %2").arg(ts, line));
+        extractedEdit->append(QString("[%1] %2").arg(ts).arg(raw));
+        scalingEdit->append(QString("[%1] %2").arg(ts).arg(grams, 0, 'f', 3));
+        taredEdit->setText(QString::number(tared));
+    }
+
+    // --- State changes (generalized) ---
+    int arrowIdx = line.indexOf("-->");
+    if (arrowIdx != -1) {
+        QString before = line.left(arrowIdx).trimmed();
+        QString after  = line.mid(arrowIdx + 3).trimmed(); // +3 to skip the arrow
+        printf("State change detected: %s --> %s\n",
+               before.toUtf8().constData(),
+               after.toUtf8().constData());
+        prevStateField->setText(before);
+        currStateField->setText(after);
+    }
 }
+

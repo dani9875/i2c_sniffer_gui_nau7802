@@ -1,0 +1,70 @@
+name: Build WeighSniffer Linux
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '*'       # trigger on any tag push
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        config: [Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Install dependencies ---
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          version: '6.10.1'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'gcc_64'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config
+
+      # --- Configure CMake ---
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+      # --- Build ---
+      - name: Build
+        run: |
+          cmake --build build --config ${{ matrix.config }}
+
+      # --- Package artifact ---
+      - name: Create release tar.gz
+        run: |
+          tar -czf build/WeighSniffer-Linux.tar.gz -C build .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WeighSniffer-Linux
+          path: build/WeighSniffer-Linux.tar.gz
+
+      # --- Create GitHub Release for tags only ---
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: build/WeighSniffer-Linux.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}

@@ -11,28 +11,28 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     // --- Main displays ---
-    rawEdit = new QTextEdit(this);          // Top-left: combined RTT + state
-    extractedEdit = new QTextEdit(this);    // Right: extracted
+    extractedEdit = new QTextEdit(this);    // Center: extracted
     scalingEdit = new QTextEdit(this);      // Right: scaled weight
-    prevStateField = new QLineEdit(this);   // Bottom-left row: prev state
-    currStateField = new QLineEdit(this);   // Bottom-left row: current state
-    taredEdit = new QTextEdit(this);        // Bottom-left row: current weight
+    prevStateField = new QLineEdit(this);   // Bottom row: prev state
+    currStateField = new QLineEdit(this);   // Bottom row: current state
 
-    rawEdit->setReadOnly(true);
     extractedEdit->setReadOnly(true);
     scalingEdit->setReadOnly(true);
-    taredEdit->setReadOnly(true);
     prevStateField->setReadOnly(true);
     currStateField->setReadOnly(true);
 
-    prevStateField->setMaximumWidth(150);
-    currStateField->setMaximumWidth(150);
-    taredEdit->setMaximumWidth(150);
+    // --- Adjust widths ---
+    extractedEdit->setMinimumWidth(600);   
+    scalingEdit->setMinimumWidth(300);     
+    prevStateField->setMaximumWidth(550);
+    currStateField->setMaximumWidth(550);
 
     // --- Start/Stop button and scaling ---
     startStopButton = new QPushButton("Start", this);
     startStopButton->setCheckable(true);
     scalingFactorInput = new QLineEdit(QString::number(scalingFactor), this);
+    scalingFactorInput->setMaximumWidth(80);
+
     connect(scalingFactorInput, &QLineEdit::editingFinished, this, [this]() {
         bool ok;
         int v = scalingFactorInput->text().toInt(&ok);
@@ -44,45 +44,49 @@ MainWindow::MainWindow(QWidget *parent)
         startStopButton->setText(on ? "Stop" : "Start");
         if (on) {
             python.start("python3", {"-u", "test1.py", deviceArg});
-            rawEdit->append("Python started with argument: " + deviceArg);
+            // extractedEdit->append("Python started with argument: " + deviceArg);
         } else {
             python.terminate();
             python.waitForFinished(1000);
-            rawEdit->append("Python stopped");
+            // extractedEdit->append("Python stopped");
         }
     });
 
-    // --- Layouts ---
-    QHBoxLayout *stateRow = new QHBoxLayout();
-    stateRow->addWidget(new QLabel("Prev State:"));
-    stateRow->addWidget(prevStateField);
-    stateRow->addWidget(new QLabel("Curr State:"));
-    stateRow->addWidget(currStateField);
-    stateRow->addWidget(new QLabel("Current Weight:"));
-    stateRow->addWidget(taredEdit);
+    // --- Labels above the columns ---
+    QHBoxLayout *columnLabels = new QHBoxLayout();
+    columnLabels->addWidget(new QLabel("RawData"));
+    columnLabels->addSpacing(560); // spacing to roughly align with extractedEdit width
+    columnLabels->addWidget(new QLabel("Weight (grams)"));
+    columnLabels->addStretch();
 
-    QVBoxLayout *leftBlock = new QVBoxLayout();
-    leftBlock->addWidget(rawEdit);   // Top large RTT display
-    leftBlock->addLayout(stateRow);  // Bottom row with prev/curr states and current weight
-
+    // --- Main horizontal layout ---
     QHBoxLayout *mainLayout = new QHBoxLayout();
-    mainLayout->addLayout(leftBlock);
     mainLayout->addWidget(extractedEdit);
     mainLayout->addWidget(scalingEdit);
 
-    QVBoxLayout *controls = new QVBoxLayout();
-    controls->addLayout(mainLayout);
-    QHBoxLayout *bottomControls = new QHBoxLayout();
-    bottomControls->addWidget(startStopButton);
-    bottomControls->addWidget(new QLabel("Scaling:"));
-    bottomControls->addWidget(scalingFactorInput);
-    controls->addLayout(bottomControls);
+    // --- Bottom row layout ---
+    QHBoxLayout *bottomRow = new QHBoxLayout();
+    bottomRow->addWidget(startStopButton);
+    bottomRow->addWidget(new QLabel("Scaling:"));
+    bottomRow->addWidget(scalingFactorInput);
+    bottomRow->addSpacing(20);
+    bottomRow->addWidget(new QLabel("Prev State:"));
+    bottomRow->addWidget(prevStateField);
+    bottomRow->addWidget(new QLabel("Curr State:"));
+    bottomRow->addWidget(currStateField);
+    bottomRow->addStretch();
+
+    // --- Central vertical layout ---
+    QVBoxLayout *centralLayout = new QVBoxLayout();
+    centralLayout->addLayout(columnLabels); // labels on top
+    centralLayout->addLayout(mainLayout);   // the two QTextEdits
+    centralLayout->addLayout(bottomRow);    // controls at bottom
 
     QWidget *central = new QWidget(this);
-    central->setLayout(controls);
+    central->setLayout(centralLayout);
     setCentralWidget(central);
 
-    resize(1400, 700);
+    resize(1200, 700); // adjust overall window width
     move(QGuiApplication::primaryScreen()->geometry().center() - rect().center());
 
     connect(&python, &QProcess::readyReadStandardOutput, this, &MainWindow::handleStdout);
@@ -116,18 +120,14 @@ void MainWindow::processLine(const QString &line)
     static QRegularExpression reLoad(R"(Load Cell Reading:\s*(-?\d+))");
     auto mLoad = reLoad.match(line);
     int raw = 0;
-    int tared = 0;
     float grams = 0.0f;
 
     if (mLoad.hasMatch()) {
         raw = mLoad.captured(1).toInt();
-        tared = raw;  // assuming already tared
-        grams = static_cast<float>(tared) / scalingFactor;
+        grams = static_cast<float>(raw) / scalingFactor;
 
-        rawEdit->append(QString("[%1] %2").arg(ts, line));
         extractedEdit->append(QString("[%1] %2").arg(ts).arg(raw));
         scalingEdit->append(QString("[%1] %2").arg(ts).arg(grams, 0, 'f', 3));
-        taredEdit->setText(QString::number(tared));
     }
 
     // --- State changes (generalized) ---
@@ -135,11 +135,20 @@ void MainWindow::processLine(const QString &line)
     if (arrowIdx != -1) {
         QString before = line.left(arrowIdx).trimmed();
         QString after  = line.mid(arrowIdx + 3).trimmed(); // +3 to skip the arrow
-        printf("State change detected: %s --> %s\n",
-               before.toUtf8().constData(),
-               after.toUtf8().constData());
+
+        // Regex to extract only ALL_CAPS_WITH_UNDERSCORES
+        QRegularExpression reState(R"([A-Z_]+)");
+
+        auto beforeMatch = reState.match(before);
+        if (beforeMatch.hasMatch())
+            before = beforeMatch.captured(0);
+
+        auto afterMatch = reState.match(after);
+        if (afterMatch.hasMatch())
+            after = afterMatch.captured(0);
+
         prevStateField->setText(before);
         currStateField->setText(after);
     }
-}
 
+}

@@ -4,10 +4,7 @@
 #include <QTextEdit>
 #include <QPushButton>
 #include <QLineEdit>
-#include <QThread>
-#include <ftdi.h>
-
-#include "ftdireader.h"
+#include <QProcess>
 
 class MainWindow : public QMainWindow
 {
@@ -18,35 +15,29 @@ public:
     ~MainWindow();
 
 private slots:
-    void onFtdiBytes(const QByteArray &data);
-    void processLine(const QByteArray &line);
+    void handleStdout();
 
 private:
-    // UI
-    QTextEdit *rawEdit;
-    QTextEdit *extractedEdit;
-    QTextEdit *taredEdit;
-    QTextEdit *scalingEdit;
-    QTextEdit *statusEdit;
+    void processLine(const QString &line);
 
+    // --- Display widgets ---
+    QTextEdit *rawEdit;          // Top-left: combined RTT + state
+    QTextEdit *extractedEdit;    // Right: extracted values
+    QTextEdit *scalingEdit;      // Right: scaled weight
+    QTextEdit *taredEdit;        // Bottom-left: current weight
+    QLineEdit *prevStateField;   // Bottom-left: previous state
+    QLineEdit *currStateField;   // Bottom-left: current state
+
+    // --- Controls ---
     QPushButton *startStopButton;
-    QPushButton *tareButton;
-    QPushButton *scalingFactorButton;
-    QLineEdit *tareInput;
     QLineEdit *scalingFactorInput;
 
-    // State
-    bool readingEnabled;
-    int scalingFactor;
-    int tareValue;
-
-    // FTDI
-    ftdi_context *ftdi;
-
-    // Threading
-    QThread *readerThread;
-    FtdiReader *reader;
-
-    // RX buffer
+    // --- Process and buffer ---
+    QProcess python;
     QByteArray rxBuffer;
+
+    // --- State ---
+    bool readingEnabled = false;
+    int scalingFactor = 399835;
+    QString deviceArg = "NRF52833_xxAA"; // device argument
 };

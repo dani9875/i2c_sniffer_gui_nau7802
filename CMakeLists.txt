@@ -17,3 +17,11 @@ add_executable(WeighSniffer
 )
 
 target_link_libraries(WeighSniffer Qt6::Widgets)
+
+# --- Copy test1.py to the output directory of the executable ---
+add_custom_command(TARGET WeighSniffer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/test1.py"
+        "$<TARGET_FILE_DIR:WeighSniffer>/test1.py"
+    COMMENT "Copying test1.py next to executable"
+)

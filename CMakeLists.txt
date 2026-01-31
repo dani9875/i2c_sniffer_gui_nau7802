@@ -17,11 +17,3 @@ add_executable(WeighSniffer
 )
 
 target_link_libraries(WeighSniffer Qt6::Widgets)
-
-# --- Copy jlink_helper.py to the output directory of the executable ---
-add_custom_command(TARGET WeighSniffer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/jlink_helper.py"
-        "$<TARGET_FILE_DIR:WeighSniffer>/jlink_helper.py"
-    COMMENT "Copying jlink_helper.py next to executable"
-)

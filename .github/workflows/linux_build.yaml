@@ -19,7 +19,6 @@ jobs:
         config: [Release]
 
     steps:
-      # --- Checkout code ---
       - uses: actions/checkout@v4
 
       # --- Install Qt and build tools ---
@@ -39,17 +38,16 @@ jobs:
         run: |
           cmake --build build --config ${{ matrix.config }}
 
-      # --- Package artifact (tar.gz outside build folder) ---
+      # --- Package artifact ---
       - name: Create release tar.gz
         run: |
-          tar -czf WeighSniffer-Linux.tar.gz -C build .
+          tar -czf build/WeighSniffer-Linux.tar.gz -C build .
 
-      # --- Upload artifact ---
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: WeighSniffer-Linux
-          path: WeighSniffer-Linux.tar.gz
+          path: build/WeighSniffer-Linux.tar.gz
 
       # --- Create GitHub Release for tags only ---
       - name: Create GitHub Release
@@ -58,6 +56,6 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          files: WeighSniffer-Linux.tar.gz
+          files: build/WeighSniffer-Linux.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}

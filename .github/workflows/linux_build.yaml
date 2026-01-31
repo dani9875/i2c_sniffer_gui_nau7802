@@ -21,20 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- Install dependencies ---
-      - name: Install Qt 6
-        uses: jurplel/install-qt-action@v3
-        with:
-          aqtversion: '==3.1.*'
-          version: '6.10.1'
-          host: 'linux'
-          target: 'desktop'
-          arch: 'gcc_64'
-
-      - name: Install build tools
+      # --- Install Qt and build tools ---
+      - name: Install Qt and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake pkg-config
+          sudo apt-get install -y build-essential cmake pkg-config qt6-base-dev
 
       # --- Configure CMake ---
       - name: Configure CMake

@@ -42,15 +42,58 @@ MainWindow::MainWindow(QWidget *parent)
     connect(startStopButton, &QPushButton::toggled, this, [this](bool on){
         readingEnabled = on;
         startStopButton->setText(on ? "Stop" : "Start");
+    
         if (on) {
-            python.start("python3", {"-u", "test1.py", deviceArg});
-            // extractedEdit->append("Python started with argument: " + deviceArg);
+            // Disconnect previous signals if any
+            python.disconnect();
+    
+            // Connect error and finished signals
+            connect(&python, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error){
+                QString msg;
+                switch (error) {
+                    case QProcess::FailedToStart: msg = "Python failed to start. Check executable/path."; break;
+                    case QProcess::Crashed:       msg = "Python crashed while running."; break;
+                    case QProcess::Timedout:      msg = "Python timed out."; break;
+                    case QProcess::ReadError:     msg = "Read error from Python."; break;
+                    case QProcess::WriteError:    msg = "Write error to Python."; break;
+                    case QProcess::UnknownError:  msg = "Unknown Python error."; break;
+                }
+                extractedEdit->append("[ERROR] " + msg);
+                startStopButton->setChecked(false);
+                readingEnabled = false;
+                startStopButton->setText("Start");
+            });
+    
+            connect(&python, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                    this, [this](int exitCode, QProcess::ExitStatus status){
+                QString msg = QString("[INFO] Python finished with exit code %1").arg(exitCode);
+                extractedEdit->append(msg);
+                startStopButton->setChecked(false);
+                readingEnabled = false;
+                startStopButton->setText("Start");
+            });
+    
+            python.start("python3", {"-u", "jlink_helper.py", deviceArg});
+    
+            // Check immediately if the process failed to start
+            if (!python.waitForStarted(1000)) { // wait 1 second
+                extractedEdit->append("[ERROR] Python did not start within 1 second.");
+                startStopButton->setChecked(false);
+                readingEnabled = false;
+                startStopButton->setText("Start");
+            } else {
+                extractedEdit->append("[INFO] Python started successfully with argument: " + deviceArg);
+            }
         } else {
             python.terminate();
-            python.waitForFinished(1000);
-            // extractedEdit->append("Python stopped");
+            if (!python.waitForFinished(1000)) {
+                python.kill();
+                python.waitForFinished();
+            }
+            extractedEdit->append("[INFO] Python stopped.");
         }
     });
+    
 
     // --- Labels above the columns ---
     QHBoxLayout *columnLabels = new QHBoxLayout();

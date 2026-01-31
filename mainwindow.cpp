@@ -43,7 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
         readingEnabled = on;
         startStopButton->setText(on ? "Stop" : "Start");
         if (on) {
-            python.start("python3", {"-u", "test1.py", deviceArg});
+            python.start("python3", {"-u", "jlink_helper.py", deviceArg});
             // extractedEdit->append("Python started with argument: " + deviceArg);
         } else {
             python.terminate();

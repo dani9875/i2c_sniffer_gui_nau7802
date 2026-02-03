@@ -31,6 +31,7 @@ private:
     // --- Controls ---
     QPushButton *startStopButton;
     QLineEdit *scalingFactorInput;
+    QString currentPhase;
 
     // --- Process and buffer ---
     QProcess python;

@@ -149,6 +149,18 @@ void MainWindow::processLine(const QString &line)
         }
     }
 
+    // --- Can Height ---
+    static QRegularExpression reCanHeight(R"(Can Height:\s*(-?\d+))");
+    auto mCanHeight = reCanHeight.match(line);
+
+    if (mCanHeight.hasMatch()) {
+        extractedEdit->append(
+            QString("[%1] Can Height: %2")
+                .arg(ts)
+                .arg(mCanHeight.captured(1))
+        );
+    }
+
     // --- State changes ---
     int arrowIdx = line.indexOf("-->");
     if (arrowIdx != -1) {

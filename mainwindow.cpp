@@ -1,3 +1,4 @@
+```cpp
 #include "mainwindow.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -161,6 +162,24 @@ void MainWindow::processLine(const QString &line)
         );
     }
 
+    // --- Carousel stall values ---
+    static QRegularExpression reStall(R"(Carousel stall values:\s*(-?\d+),\s*(-?\d+),\s*(-?\d+))");
+    auto mStall = reStall.match(line);
+
+    if (mStall.hasMatch()) {
+        int load          = mStall.captured(1).toInt();
+        int stallLoad      = mStall.captured(2).toInt();
+        int stepsPerSec    = mStall.captured(3).toInt();
+
+        extractedEdit->append(
+            QString("[%1] Stall load=%2 stall_load=%3 steps/s=%4")
+                .arg(ts)
+                .arg(load)
+                .arg(stallLoad)
+                .arg(stepsPerSec)
+        );
+    }
+
     // --- State changes ---
     int arrowIdx = line.indexOf("-->");
     if (arrowIdx != -1) {
@@ -183,3 +202,4 @@ void MainWindow::processLine(const QString &line)
         currentPhase = after;
     }
 }
+```
